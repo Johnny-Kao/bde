@@ -1,0 +1,88 @@
+name: Validate bdls_pathutil known-length experiment
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/bdls-pathutil-known-length
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout patched branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout BDE tools
+        uses: actions/checkout@v4
+        with:
+          repository: bloomberg/bde-tools
+          path: bde-tools
+
+      - name: Build baseline benchmark binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASELINE_SHA=9aea87f10
+          BASELINE_DIR="$RUNNER_TEMP/bde-baseline"
+          git worktree add "$BASELINE_DIR" "$BASELINE_SHA"
+          cd "$BASELINE_DIR"
+          export PATH="$GITHUB_WORKSPACE/bde-tools/bin:$PATH"
+          eval "$(bbs_build_env -u opt_dbg_64_cpp17)"
+          bbs_build configure --regex "bdls"
+          bbs_build build --target bdls_pathutil.t --tests build
+          TEST_BIN="$(find "$BDE_CMAKE_BUILD_DIR" -type f -name 'bdls_pathutil.t' -perm -111 | head -1)"
+          test -n "$TEST_BIN"
+          cp "$TEST_BIN" "$RUNNER_TEMP/bdls_pathutil.baseline"
+
+      - name: Build patched benchmark binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          export PATH="$GITHUB_WORKSPACE/bde-tools/bin:$PATH"
+          eval "$(bbs_build_env -u opt_dbg_64_cpp17)"
+          bbs_build configure --regex "bdls"
+          bbs_build build --target bdls_pathutil.t --tests build
+          TEST_BIN="$(find "$BDE_CMAKE_BUILD_DIR" -type f -name 'bdls_pathutil.t' -perm -111 | head -1)"
+          test -n "$TEST_BIN"
+          cp "$TEST_BIN" "$RUNNER_TEMP/bdls_pathutil.patched"
+
+      - name: Run patched bdls_pathutil regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          export PATH="$GITHUB_WORKSPACE/bde-tools/bin:$PATH"
+          eval "$(bbs_build_env -u opt_dbg_64_cpp17)"
+          bbs_build build --target bdls_pathutil.t --tests run
+
+      - name: Compare embedded NUL behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== BASELINE ==="
+          "$RUNNER_TEMP/bdls_pathutil.baseline" 98
+          echo "=== PATCHED ==="
+          "$RUNNER_TEMP/bdls_pathutil.patched" 98
+
+      - name: Run alternating A/B benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3; do
+            echo "=== ROUND $round ==="
+            if (( round % 2 )); then
+              echo "--- BASELINE ---"
+              "$RUNNER_TEMP/bdls_pathutil.baseline" 99
+              echo "--- PATCHED ---"
+              "$RUNNER_TEMP/bdls_pathutil.patched" 99
+            else
+              echo "--- PATCHED ---"
+              "$RUNNER_TEMP/bdls_pathutil.patched" 99
+              echo "--- BASELINE ---"
+              "$RUNNER_TEMP/bdls_pathutil.baseline" 99
+            fi
+          done
