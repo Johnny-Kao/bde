@@ -10,6 +10,8 @@
 #include <bsls_asserttest.h>
 #include <bsls_platform.h>
 #include <bsls_review.h>
+#include <bsls_timeutil.h>
+#include <bsls_types.h>
 
 #include <bsl_cstdlib.h>
 #include <bsl_cstring.h>
@@ -1234,6 +1236,85 @@ int main(int argc, char *argv[])
     bsls::ReviewFailureHandlerGuard reviewGuard(&bsls::Review::failByAbort);
 
     switch(test) { case 0:
+      case 99: {
+        // --------------------------------------------------------------------
+        // RESEARCH BENCHMARK: known-length path handling
+        // --------------------------------------------------------------------
+
+        const int LENGTHS[]    = { 32, 128, 512, 4096 };
+        const int ITERATIONS[] = { 500000, 250000, 100000, 20000 };
+        const int NUM_LENGTHS  = sizeof LENGTHS / sizeof *LENGTHS;
+
+        for (int mode = 0; mode < 2; ++mode) {
+            const int rootEnd = mode == 0 ? 0 : -1;
+
+            for (int i = 0; i < NUM_LENGTHS; ++i) {
+                const int pathLength = LENGTHS[i];
+                const int iterations = ITERATIONS[i];
+
+                bsl::string path(pathLength, 'a');
+                bsls::Types::Int64 checksum = 0;
+
+                for (int warmup = 0; warmup < 1000; ++warmup) {
+                    Obj::appendRaw(&path, "z", 1, rootEnd);
+                    ASSERT(0 == Obj::popLeaf(&path, rootEnd));
+                }
+
+                for (int rep = 0; rep < 3; ++rep) {
+                    const bsls::Types::Int64 start =
+                                               bsls::TimeUtil::getTimer();
+
+                    for (int n = 0; n < iterations; ++n) {
+                        Obj::appendRaw(&path, "z", 1, rootEnd);
+                        ASSERT(0 == Obj::popLeaf(&path, rootEnd));
+                        checksum += static_cast<bsls::Types::Int64>(
+                                                               path.length());
+                    }
+
+                    const bsls::Types::Int64 elapsed =
+                                  bsls::TimeUtil::getTimer() - start;
+
+                    cout << "N2_BENCH"
+                         << " mode=" << (mode == 0 ? "known-root" : "default")
+                         << " length=" << pathLength
+                         << " iterations=" << iterations
+                         << " rep=" << rep
+                         << " elapsed=" << elapsed
+                         << " checksum=" << checksum
+                         << endl;
+                }
+            }
+        }
+      } break;
+      case 98: {
+        // --------------------------------------------------------------------
+        // RESEARCH PROBE: embedded NUL behavior
+        // --------------------------------------------------------------------
+
+        const char RAW_PATH[] = { '/', '\0', 'a' };
+
+        bsl::string appendPath(RAW_PATH, sizeof RAW_PATH);
+        Obj::appendRaw(&appendPath, "z", 1, -1);
+
+        cout << "N2_NUL_APPEND size=" << appendPath.size() << " bytes=";
+        for (bsl::size_t i = 0; i < appendPath.size(); ++i) {
+            cout << static_cast<unsigned int>(
+                       static_cast<unsigned char>(appendPath[i])) << ',';
+        }
+        cout << endl;
+
+        bsl::string popPath(RAW_PATH, sizeof RAW_PATH);
+        const int popRc = Obj::popLeaf(&popPath, -1);
+
+        cout << "N2_NUL_POP rc=" << popRc
+             << " size=" << popPath.size()
+             << " bytes=";
+        for (bsl::size_t i = 0; i < popPath.size(); ++i) {
+            cout << static_cast<unsigned int>(
+                       static_cast<unsigned char>(popPath[i])) << ',';
+        }
+        cout << endl;
+      } break;
       case 8: {
         // --------------------------------------------------------------------
         // USAGE EXAMPLE
