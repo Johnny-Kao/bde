@@ -122,6 +122,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: pr/bdls-pathutil-preserve-known-length
+          fetch-depth: 2
 
       - name: Checkout BDE tools
         uses: actions/checkout@v4
@@ -134,8 +135,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "e9926f6aeead5cbf867f9ad7f821e3bdf6d30150"
-          git diff --check 4712408fd603b83e2b1d596b0a2fb11bfae429b4...HEAD
-          test "$(git diff --name-only 4712408fd603b83e2b1d596b0a2fb11bfae429b4...HEAD)" = "groups/bdl/bdls/bdls_pathutil.cpp"
+          test "$(git rev-parse HEAD^)" = "4712408fd603b83e2b1d596b0a2fb11bfae429b4"
+          git diff --check HEAD^..HEAD
+          test "$(git diff --name-only HEAD^..HEAD)" = "groups/bdl/bdls/bdls_pathutil.cpp"
 
       - name: Configure bdls
         shell: bash
