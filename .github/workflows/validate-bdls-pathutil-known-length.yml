@@ -114,3 +114,41 @@ jobs:
           export PATH="$PWD/bde-tools/bin:$PATH"
           eval "$(bbs_build_env -u opt_dbg_64_cpp17)"
           bbs_build build --target bdls_pathutil.t --tests run
+
+  clean-head-signoff:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout clean PR candidate
+        uses: actions/checkout@v4
+        with:
+          ref: pr/bdls-pathutil-preserve-known-length
+
+      - name: Checkout BDE tools
+        uses: actions/checkout@v4
+        with:
+          repository: bloomberg/bde-tools
+          path: bde-tools
+
+      - name: Verify final HEAD and diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "e9926f6aeead5cbf867f9ad7f821e3bdf6d30150"
+          git diff --check 4712408fd603b83e2b1d596b0a2fb11bfae429b4...HEAD
+          test "$(git diff --name-only 4712408fd603b83e2b1d596b0a2fb11bfae429b4...HEAD)" = "groups/bdl/bdls/bdls_pathutil.cpp"
+
+      - name: Configure bdls
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$PWD/bde-tools/bin:$PATH"
+          eval "$(bbs_build_env -u opt_dbg_64_cpp17)"
+          bbs_build configure --regex "bdls"
+
+      - name: Run full bdls package tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$PWD/bde-tools/bin:$PATH"
+          eval "$(bbs_build_env -u opt_dbg_64_cpp17)"
+          bbs_build build --target bdls --tests run
