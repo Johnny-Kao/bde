@@ -25,10 +25,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BASELINE_SHA=9aea87f10
           BASELINE_DIR="$RUNNER_TEMP/bde-baseline"
-          git worktree add "$BASELINE_DIR" "$BASELINE_SHA"
+          git worktree add "$BASELINE_DIR" HEAD
           cd "$BASELINE_DIR"
+          git revert --no-commit d459cffdf
           export PATH="$GITHUB_WORKSPACE/bde-tools/bin:$PATH"
           eval "$(bbs_build_env -u opt_dbg_64_cpp17)"
           bbs_build configure --regex "bdls"
@@ -86,3 +86,31 @@ jobs:
               "$RUNNER_TEMP/bdls_pathutil.baseline" 99
             fi
           done
+
+  windows-correctness:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout patched branch
+        uses: actions/checkout@v4
+
+      - name: Checkout BDE tools
+        uses: actions/checkout@v4
+        with:
+          repository: bloomberg/bde-tools
+          path: bde-tools
+
+      - name: Configure bdls
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$PWD/bde-tools/bin:$PATH"
+          eval "$(bbs_build_env -u opt_dbg_64_cpp17)"
+          bbs_build configure --regex "bdls"
+
+      - name: Run bdls_pathutil regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$PWD/bde-tools/bin:$PATH"
+          eval "$(bbs_build_env -u opt_dbg_64_cpp17)"
+          bbs_build build --target bdls_pathutil.t --tests run

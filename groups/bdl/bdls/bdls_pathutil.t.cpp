@@ -1252,36 +1252,70 @@ int main(int argc, char *argv[])
                 const int pathLength = LENGTHS[i];
                 const int iterations = ITERATIONS[i];
 
-                bsl::string path(pathLength, 'a');
-                bsls::Types::Int64 checksum = 0;
+                for (int operation = 0; operation < 3; ++operation) {
+                    bsl::string path(pathLength, 'a');
+                    bsls::Types::Int64 checksum = 0;
 
-                for (int warmup = 0; warmup < 1000; ++warmup) {
-                    Obj::appendRaw(&path, "z", 1, rootEnd);
-                    ASSERT(0 == Obj::popLeaf(&path, rootEnd));
-                }
-
-                for (int rep = 0; rep < 3; ++rep) {
-                    const bsls::Types::Int64 start =
-                                               bsls::TimeUtil::getTimer();
-
-                    for (int n = 0; n < iterations; ++n) {
-                        Obj::appendRaw(&path, "z", 1, rootEnd);
-                        ASSERT(0 == Obj::popLeaf(&path, rootEnd));
-                        checksum += static_cast<bsls::Types::Int64>(
-                                                               path.length());
+                    if (2 == operation) {
+                        path.push_back(Obj::k_SEPARATOR);
+                        path.push_back('z');
                     }
 
-                    const bsls::Types::Int64 elapsed =
-                                  bsls::TimeUtil::getTimer() - start;
+                    for (int warmup = 0; warmup < 1000; ++warmup) {
+                        if (0 == operation) {
+                            Obj::appendRaw(&path, "z", 1, rootEnd);
+                            ASSERT(0 == Obj::popLeaf(&path, rootEnd));
+                        }
+                        else if (1 == operation) {
+                            Obj::appendRaw(&path, "z", 1, rootEnd);
+                            path.resize(pathLength);
+                        }
+                        else {
+                            ASSERT(0 == Obj::popLeaf(&path, rootEnd));
+                            path.push_back(Obj::k_SEPARATOR);
+                            path.push_back('z');
+                        }
+                    }
 
-                    cout << "N2_BENCH"
-                         << " mode=" << (mode == 0 ? "known-root" : "default")
-                         << " length=" << pathLength
-                         << " iterations=" << iterations
-                         << " rep=" << rep
-                         << " elapsed=" << elapsed
-                         << " checksum=" << checksum
-                         << endl;
+                    for (int rep = 0; rep < 3; ++rep) {
+                        const bsls::Types::Int64 start =
+                                                   bsls::TimeUtil::getTimer();
+
+                        for (int n = 0; n < iterations; ++n) {
+                            if (0 == operation) {
+                                Obj::appendRaw(&path, "z", 1, rootEnd);
+                                ASSERT(0 == Obj::popLeaf(&path, rootEnd));
+                            }
+                            else if (1 == operation) {
+                                Obj::appendRaw(&path, "z", 1, rootEnd);
+                                path.resize(pathLength);
+                            }
+                            else {
+                                ASSERT(0 == Obj::popLeaf(&path, rootEnd));
+                                path.push_back(Obj::k_SEPARATOR);
+                                path.push_back('z');
+                            }
+                            checksum += static_cast<bsls::Types::Int64>(
+                                                               path.length());
+                        }
+
+                        const bsls::Types::Int64 elapsed =
+                                      bsls::TimeUtil::getTimer() - start;
+
+                        cout << "N2_BENCH"
+                             << " operation="
+                             << (0 == operation
+                                     ? "pair"
+                                     : (1 == operation ? "append" : "pop"))
+                             << " mode="
+                             << (mode == 0 ? "known-root" : "default")
+                             << " length=" << pathLength
+                             << " iterations=" << iterations
+                             << " rep=" << rep
+                             << " elapsed=" << elapsed
+                             << " checksum=" << checksum
+                             << endl;
+                    }
                 }
             }
         }
